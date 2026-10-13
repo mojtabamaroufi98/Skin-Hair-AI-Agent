@@ -1,7 +1,7 @@
-
 from typing import Optional
 import os
 import requests
+
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -14,19 +14,40 @@ load_dotenv()
 
 
 # ==========================================
-# Web Search Configuration
+# Sarovi Configuration
 # ==========================================
 
-WEB_SEARCH_API_KEY = os.getenv("REQUESTY_API_KEY")
+SAROVI_API_KEY = os.getenv("SAROVI_API_KEY")
 
-REQUESTY_RESPONSES_URL = os.getenv(
-    "REQUESTY_RESPONSES_URL",
-    "https://router.requesty.ai/v1/responses"
+SAROVI_BASE_URL = os.getenv(
+    "SAROVI_BASE_URL",
+    "https://api.sarovi.ir/v1"
+)
+
+SAROVI_RESPONSES_URL = os.getenv(
+    "SAROVI_RESPONSES_URL",
+    "https://api.sarovi.ir/v1/responses"
+)
+
+SAROVI_MODEL = os.getenv(
+    "SAROVI_MODEL",
+    "anthropic/claude-sonnet-5"
 )
 
 WEB_SEARCH_MODEL = os.getenv(
     "WEB_SEARCH_MODEL",
     "z-ai/glm-5.3-flash"
+)
+
+
+# ==========================================
+# Sarovi LLM Client
+# ==========================================
+
+llm_client = OpenAI(
+    api_key=SAROVI_API_KEY,
+    base_url=SAROVI_BASE_URL,
+    timeout=120.0
 )
 
 
@@ -40,7 +61,7 @@ def search_web(query: str):
     مرتبط با پوست، مو و مراقبت از آنها.
     """
 
-    if not query:
+    if not query or not query.strip():
         return {
             "success": False,
             "tool": "search_web",
@@ -49,12 +70,12 @@ def search_web(query: str):
             "results": []
         }
 
-    if not WEB_SEARCH_API_KEY:
+    if not SAROVI_API_KEY:
         return {
             "success": False,
             "tool": "search_web",
             "query": query,
-            "error": "REQUESTY_API_KEY در فایل .env پیدا نشد.",
+            "error": "SAROVI_API_KEY در فایل .env پیدا نشد.",
             "results": []
         }
 
@@ -95,25 +116,21 @@ def search_web(query: str):
             "web_search": True
         }
 
-
         headers = {
-            "Authorization": f"Bearer {WEB_SEARCH_API_KEY}",
+            "Authorization": f"Bearer {SAROVI_API_KEY}",
             "Content-Type": "application/json"
         }
 
-
         response = requests.post(
-            REQUESTY_RESPONSES_URL,
+            SAROVI_RESPONSES_URL,
             headers=headers,
             json=payload,
             timeout=120
         )
 
-
         response.raise_for_status()
 
         data = response.json()
-
 
         # ==========================================
         # Main Answer
@@ -124,78 +141,45 @@ def search_web(query: str):
             ""
         )
 
-
         # ==========================================
         # Extract Sources
         # ==========================================
 
         sources = []
 
+        for output_item in data.get("output", []):
 
-        for output_item in data.get(
-            "output",
-            []
-        ):
-
-            if not isinstance(
-                output_item,
-                dict
-            ):
+            if not isinstance(output_item, dict):
                 continue
-
 
             content = output_item.get(
                 "content",
                 []
             )
 
-
-            if not isinstance(
-                content,
-                list
-            ):
+            if not isinstance(content, list):
                 continue
-
 
             for content_item in content:
 
-                if not isinstance(
-                    content_item,
-                    dict
-                ):
+                if not isinstance(content_item, dict):
                     continue
-
 
                 annotations = content_item.get(
                     "annotations",
                     []
                 )
 
-
-                if not isinstance(
-                    annotations,
-                    list
-                ):
+                if not isinstance(annotations, list):
                     continue
-
 
                 for annotation in annotations:
 
-                    if not isinstance(
-                        annotation,
-                        dict
-                    ):
+                    if not isinstance(annotation, dict):
                         continue
 
-
-                    url = annotation.get(
-                        "url"
-                    )
-
-                    title = annotation.get(
-                        "title"
-                    )
-
+                    url = annotation.get("url")
+                    title = annotation.get("title")
 
                     if url:
 
@@ -204,13 +188,8 @@ def search_web(query: str):
                             "url": url
                         }
 
-
                         if source not in sources:
-
-                            sources.append(
-                                source
-                            )
-
+                            sources.append(source)
 
         return {
             "success": True,
@@ -219,7 +198,6 @@ def search_web(query: str):
             "answer": answer,
             "sources": sources
         }
-
 
     except requests.exceptions.RequestException as e:
 
@@ -230,7 +208,6 @@ def search_web(query: str):
             "error": str(e),
             "results": []
         }
-
 
     except Exception as e:
 
@@ -257,7 +234,7 @@ def search_products(
     در بازار ایران با استفاده از Web Search.
     """
 
-    if not query:
+    if not query or not query.strip():
 
         return {
             "success": False,
@@ -267,11 +244,9 @@ def search_products(
             "results": []
         }
 
-
     try:
 
-        search_query = query
-
+        search_query = query.strip()
 
         # ==========================================
         # Skin Type
@@ -283,7 +258,6 @@ def search_products(
                 f" برای پوست {skin_type}"
             )
 
-
         # ==========================================
         # Category
         # ==========================================
@@ -293,7 +267,6 @@ def search_products(
             search_query += (
                 f" {category}"
             )
-
 
         # ==========================================
         # Iran Market
@@ -309,19 +282,13 @@ def search_products(
 لینک صفحه محصول در صورت وجود.
 """
 
-
         # ==========================================
         # Web Search
         # ==========================================
 
-        result = search_web(
-            search_query
-        )
+        result = search_web(search_query)
 
-
-        if not result.get(
-            "success"
-        ):
+        if not result.get("success"):
 
             return {
                 "success": False,
@@ -329,12 +296,9 @@ def search_products(
                 "query": query,
                 "skin_type": skin_type,
                 "category": category,
-                "error": result.get(
-                    "error"
-                ),
+                "error": result.get("error"),
                 "results": []
             }
-
 
         return {
             "success": True,
@@ -352,7 +316,6 @@ def search_products(
             )
         }
 
-
     except Exception as e:
 
         return {
@@ -369,7 +332,6 @@ def search_products(
 # ==========================================
 # Ingredient Analysis
 # ==========================================
-
 
 def analyze_ingredients(
     ingredients: str
@@ -390,13 +352,13 @@ def analyze_ingredients(
             "error": "فهرست ترکیبات خالی است."
         }
 
-    if not LLM_API_KEY:
+    if not SAROVI_API_KEY:
 
         return {
             "success": False,
             "tool": "analyze_ingredients",
             "ingredients": ingredients,
-            "error": "REQUESTY_API_KEY در فایل .env پیدا نشد."
+            "error": "SAROVI_API_KEY در فایل .env پیدا نشد."
         }
 
     try:
@@ -429,9 +391,8 @@ def analyze_ingredients(
 - پاسخ را واضح و قابل فهم برای کاربر عادی بنویس.
 """
 
-
         response = llm_client.chat.completions.create(
-            model=LLM_MODEL,
+            model=SAROVI_MODEL,
 
             messages=[
                 {
@@ -453,9 +414,7 @@ def analyze_ingredients(
             max_tokens=1200
         )
 
-
         analysis = response.choices[0].message.content
-
 
         return {
             "success": True,
@@ -463,7 +422,6 @@ def analyze_ingredients(
             "ingredients": ingredients,
             "analysis": analysis
         }
-
 
     except Exception as e:
 
@@ -519,6 +477,7 @@ def create_routine(
             "چرب",
             "oily"
         ]):
+
             morning_skin = [
                 "شست‌وشوی ملایم صورت",
                 "مرطوب‌کننده سبک و غیرکومدون‌زا",
@@ -541,6 +500,7 @@ def create_routine(
             "خشک",
             "dry"
         ]):
+
             morning_skin = [
                 "شست‌وشوی ملایم یا پاکسازی بدون ایجاد خشکی",
                 "مرطوب‌کننده مناسب پوست خشک",
@@ -563,6 +523,7 @@ def create_routine(
             "مختلط",
             "combination"
         ]):
+
             morning_skin = [
                 "شست‌وشوی ملایم صورت",
                 "مرطوب‌کننده سبک",
@@ -585,6 +546,7 @@ def create_routine(
             "حساس",
             "sensitive"
         ]):
+
             morning_skin = [
                 "پاکسازی بسیار ملایم",
                 "مرطوب‌کننده ساده و مناسب پوست حساس",
@@ -607,6 +569,7 @@ def create_routine(
         # ---------- Normal Skin ----------
 
         else:
+
             morning_skin = [
                 "شست‌وشوی ملایم صورت",
                 "مرطوب‌کننده",
@@ -633,6 +596,7 @@ def create_routine(
             "چرب",
             "oily"
         ]):
+
             hair_routine = [
                 "شست‌وشوی مو بر اساس میزان چربی پوست سر",
                 "استفاده از شامپوی ملایم مناسب پوست سر چرب",
@@ -649,6 +613,7 @@ def create_routine(
             "خشک",
             "dry"
         ]):
+
             hair_routine = [
                 "شست‌وشوی ملایم مو",
                 "استفاده از نرم‌کننده پس از شست‌وشو",
@@ -666,6 +631,7 @@ def create_routine(
             "آسیب دیده",
             "damaged"
         ]):
+
             hair_routine = [
                 "شست‌وشوی ملایم",
                 "استفاده منظم از نرم‌کننده",
@@ -680,6 +646,7 @@ def create_routine(
         # ---------- Normal Hair ----------
 
         else:
+
             hair_routine = [
                 "شست‌وشوی مو بر اساس نیاز",
                 "استفاده از شامپوی ملایم",
@@ -734,10 +701,10 @@ def create_routine(
         )
     }
 
+
 # ==========================================
 # Safety Check
 # ==========================================
-
 
 def safety_check(
     message: str,
@@ -752,6 +719,7 @@ def safety_check(
     """
 
     if not message:
+
         return {
             "success": False,
             "tool": "safety_check",
@@ -821,21 +789,21 @@ def safety_check(
         ],
 
         "sudden_hair_loss": [
-    "ریزش ناگهانی مو",
-    "ریزش ناگهانی موی",
-    "ریزش شدید مو",
-    "ریزش شدید موی",
-    "ریزش خیلی شدید مو",
-    "ریزش خیلی شدید موی",
-    "ریزش مو به صورت ناگهانی",
-    "ریزش موی من به صورت ناگهانی",
-    "ناگهان موهام میریزه",
-    "ناگهانی موهام میریزه",
-    "موهام ناگهانی میریزه",
-    "sudden hair loss",
-    "severe hair loss"
+            "ریزش ناگهانی مو",
+            "ریزش ناگهانی موی",
+            "ریزش شدید مو",
+            "ریزش شدید موی",
+            "ریزش خیلی شدید مو",
+            "ریزش خیلی شدید موی",
+            "ریزش مو به صورت ناگهانی",
+            "ریزش موی من به صورت ناگهانی",
+            "ناگهان موهام میریزه",
+            "ناگهانی موهام میریزه",
+            "موهام ناگهانی میریزه",
+            "sudden hair loss",
+            "severe hair loss"
         ]
-}
+    }
 
     # ==========================================
     # Combine Text
@@ -899,22 +867,3 @@ def safety_check(
         "detected_warnings": detected,
         "reason": reason
     }
-# ==========================================
-# LLM Client for Ingredient Analysis
-# ==========================================
-
-LLM_API_KEY = os.getenv("REQUESTY_API_KEY")
-LLM_BASE_URL = os.getenv(
-    "REQUESTY_BASE_URL",
-    "https://router.requesty.ai/v1"
-)
-LLM_MODEL = os.getenv(
-    "REQUESTY_MODEL",
-    "google/gemma-4-31b-it"
-)
-
-llm_client = OpenAI(
-    api_key=LLM_API_KEY,
-    base_url=LLM_BASE_URL,
-    timeout=120.0
-)

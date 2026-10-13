@@ -22,24 +22,30 @@ from tools import (
 
 load_dotenv()
 
-api_key = os.getenv("REQUESTY_API_KEY")
-base_url = os.getenv("REQUESTY_BASE_URL")
-model = os.getenv("REQUESTY_MODEL")
+api_key = os.getenv("SAROVI_API_KEY")
+base_url = os.getenv(
+    "SAROVI_BASE_URL",
+    "https://api.sarovi.ir/v1"
+)
+model = os.getenv(
+    "SAROVI_MODEL",
+    "anthropic/claude-sonnet-5"
+)
 
 
 if not api_key:
     raise ValueError(
-        "REQUESTY_API_KEY در فایل .env پیدا نشد."
+        "SAROVI_API_KEY در فایل .env پیدا نشد."
     )
 
 if not base_url:
     raise ValueError(
-        "REQUESTY_BASE_URL در فایل .env پیدا نشد."
+        "SAROVI_BASE_URL در فایل .env پیدا نشد."
     )
 
 if not model:
     raise ValueError(
-        "REQUESTY_MODEL در فایل .env پیدا نشد."
+        "SAROVI_MODEL در فایل .env پیدا نشد."
     )
 
 
@@ -52,8 +58,6 @@ client = OpenAI(
     base_url=base_url,
     timeout=120.0
 )
-
-MODEL_NAME = model
 
 
 # ==========================================
@@ -292,7 +296,6 @@ def execute_tool(
             )
         )
 
-
     if tool_name == "search_products":
 
         return search_products(
@@ -300,16 +303,13 @@ def execute_tool(
                 "query",
                 ""
             ),
-
             skin_type=arguments.get(
                 "skin_type"
             ),
-
             category=arguments.get(
                 "category"
             )
         )
-
 
     if tool_name == "analyze_ingredients":
 
@@ -320,24 +320,20 @@ def execute_tool(
             )
         )
 
-
     if tool_name == "create_routine":
 
         return create_routine(
             skin_type=arguments.get(
                 "skin_type"
             ),
-
             hair_type=arguments.get(
                 "hair_type"
             ),
-
             days=arguments.get(
                 "days",
                 7
             )
         )
-
 
     if tool_name == "safety_check":
 
@@ -346,12 +342,10 @@ def execute_tool(
                 "message",
                 ""
             ),
-
             image_analysis=arguments.get(
                 "image_analysis"
             )
         )
-
 
     return {
         "success": False,
@@ -373,11 +367,9 @@ def assistant_message_to_dict(
         "content": assistant_message.content
     }
 
-
     if assistant_message.tool_calls:
 
         message_dict["tool_calls"] = []
-
 
         for tool_call in assistant_message.tool_calls:
 
@@ -396,7 +388,6 @@ def assistant_message_to_dict(
                     }
                 }
             )
-
 
     return message_dict
 
@@ -437,13 +428,11 @@ def run_agent(
                 "utf-8"
             )
 
-
             mime_type = (
                 image_type
                 or
                 "image/jpeg"
             )
-
 
             user_content.append(
                 {
@@ -493,28 +482,19 @@ def run_agent(
             )
             print("=" * 60)
 
-
             response = (
                 client.chat.completions.create(
-                    model=MODEL_NAME,
-
+                    model=model,
                     messages=messages,
-
                     tools=TOOLS,
-
                     tool_choice="auto",
-
                     max_tokens=MAX_TOKENS
                 )
             )
 
-
             choice = response.choices[0]
 
-            assistant_message = (
-                choice.message
-            )
-
+            assistant_message = choice.message
 
             print(
                 "FINISH REASON:",
@@ -532,7 +512,6 @@ def run_agent(
                     assistant_message.content
                 )
 
-
                 if not final_answer:
 
                     return (
@@ -540,11 +519,9 @@ def run_agent(
                         "دریافت نشد."
                     )
 
-
                 print(
                     "NO MORE TOOLS REQUIRED"
                 )
-
 
                 return final_answer
 
@@ -554,7 +531,6 @@ def run_agent(
             # ==================================
 
             print("\nTOOLS CALLED:")
-
 
             messages.append(
                 assistant_message_to_dict(
@@ -668,10 +644,8 @@ def run_agent(
 
         final_response = (
             client.chat.completions.create(
-                model=MODEL_NAME,
-
+                model=model,
                 messages=messages,
-
                 max_tokens=MAX_TOKENS
             )
         )
@@ -710,7 +684,6 @@ def run_agent(
         print(
             repr(e)
         )
-
 
         return (
             "متأسفانه هنگام پردازش درخواست شما "
