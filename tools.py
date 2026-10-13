@@ -14,39 +14,50 @@ load_dotenv()
 
 
 # ==========================================
-# Sarovi Configuration
+# Main AI Configuration
 # ==========================================
 
-SAROVI_API_KEY = os.getenv("SAROVI_API_KEY")
-
-SAROVI_BASE_URL = os.getenv(
-    "SAROVI_BASE_URL",
-    "https://api.sarovi.ir/v1"
-)
-
-SAROVI_RESPONSES_URL = os.getenv(
-    "SAROVI_RESPONSES_URL",
-    "https://api.sarovi.ir/v1/responses"
-)
-
-SAROVI_MODEL = os.getenv(
-    "SAROVI_MODEL",
-    "anthropic/claude-sonnet-5"
-)
-
-WEB_SEARCH_MODEL = os.getenv(
-    "WEB_SEARCH_MODEL",
-    "z-ai/glm-5.3-flash"
-)
+AI_API_KEY = os.getenv("AI_API_KEY")
+AI_BASE_URL = os.getenv("AI_BASE_URL")
+AI_MODEL = os.getenv("AI_MODEL")
 
 
 # ==========================================
-# Sarovi LLM Client
+# Web Search Configuration
+# ==========================================
+
+WEB_SEARCH_API_KEY = os.getenv("WEB_SEARCH_API_KEY")
+WEB_SEARCH_BASE_URL = os.getenv("WEB_SEARCH_BASE_URL")
+WEB_SEARCH_MODEL = os.getenv("WEB_SEARCH_MODEL")
+
+
+# ==========================================
+# Validation
+# ==========================================
+
+if not AI_API_KEY:
+    raise ValueError(
+        "AI_API_KEY در فایل .env پیدا نشد."
+    )
+
+if not AI_BASE_URL:
+    raise ValueError(
+        "AI_BASE_URL در فایل .env پیدا نشد."
+    )
+
+if not AI_MODEL:
+    raise ValueError(
+        "AI_MODEL در فایل .env پیدا نشد."
+    )
+
+
+# ==========================================
+# Main LLM Client
 # ==========================================
 
 llm_client = OpenAI(
-    api_key=SAROVI_API_KEY,
-    base_url=SAROVI_BASE_URL,
+    api_key=AI_API_KEY,
+    base_url=AI_BASE_URL,
     timeout=120.0
 )
 
@@ -62,6 +73,7 @@ def search_web(query: str):
     """
 
     if not query or not query.strip():
+
         return {
             "success": False,
             "tool": "search_web",
@@ -70,16 +82,50 @@ def search_web(query: str):
             "results": []
         }
 
-    if not SAROVI_API_KEY:
+    if not WEB_SEARCH_API_KEY:
+
         return {
             "success": False,
             "tool": "search_web",
             "query": query,
-            "error": "SAROVI_API_KEY در فایل .env پیدا نشد.",
+            "error": "WEB_SEARCH_API_KEY در فایل .env پیدا نشد.",
+            "results": []
+        }
+
+    if not WEB_SEARCH_BASE_URL:
+
+        return {
+            "success": False,
+            "tool": "search_web",
+            "query": query,
+            "error": "WEB_SEARCH_BASE_URL در فایل .env پیدا نشد.",
+            "results": []
+        }
+
+    if not WEB_SEARCH_MODEL:
+
+        return {
+            "success": False,
+            "tool": "search_web",
+            "query": query,
+            "error": "WEB_SEARCH_MODEL در فایل .env پیدا نشد.",
             "results": []
         }
 
     try:
+
+        # ==========================================
+        # Responses URL
+        # ==========================================
+
+        responses_url = (
+            WEB_SEARCH_BASE_URL.rstrip("/")
+            + "/responses"
+        )
+
+        # ==========================================
+        # Payload
+        # ==========================================
 
         payload = {
             "model": WEB_SEARCH_MODEL,
@@ -116,13 +162,23 @@ def search_web(query: str):
             "web_search": True
         }
 
+        # ==========================================
+        # Headers
+        # ==========================================
+
         headers = {
-            "Authorization": f"Bearer {SAROVI_API_KEY}",
+            "Authorization": (
+                f"Bearer {WEB_SEARCH_API_KEY}"
+            ),
             "Content-Type": "application/json"
         }
 
+        # ==========================================
+        # Request
+        # ==========================================
+
         response = requests.post(
-            SAROVI_RESPONSES_URL,
+            responses_url,
             headers=headers,
             json=payload,
             timeout=120
@@ -184,12 +240,22 @@ def search_web(query: str):
                     if url:
 
                         source = {
-                            "title": title or "منبع وب",
+                            "title": (
+                                title
+                                or "منبع وب"
+                            ),
                             "url": url
                         }
 
                         if source not in sources:
-                            sources.append(source)
+
+                            sources.append(
+                                source
+                            )
+
+        # ==========================================
+        # Result
+        # ==========================================
 
         return {
             "success": True,
@@ -286,7 +352,9 @@ def search_products(
         # Web Search
         # ==========================================
 
-        result = search_web(search_query)
+        result = search_web(
+            search_query
+        )
 
         if not result.get("success"):
 
@@ -340,7 +408,8 @@ def analyze_ingredients(
     تحلیل ترکیبات یک محصول پوستی یا مویی
     با استفاده از مدل زبانی.
 
-    این تابع تشخیص پزشکی یا تجویز درمانی انجام نمی‌دهد.
+    این تابع تشخیص پزشکی یا تجویز درمانی
+    انجام نمی‌دهد.
     """
 
     if not ingredients or not ingredients.strip():
@@ -352,13 +421,22 @@ def analyze_ingredients(
             "error": "فهرست ترکیبات خالی است."
         }
 
-    if not SAROVI_API_KEY:
+    if not AI_API_KEY:
 
         return {
             "success": False,
             "tool": "analyze_ingredients",
             "ingredients": ingredients,
-            "error": "SAROVI_API_KEY در فایل .env پیدا نشد."
+            "error": "AI_API_KEY در فایل .env پیدا نشد."
+        }
+
+    if not AI_MODEL:
+
+        return {
+            "success": False,
+            "tool": "analyze_ingredients",
+            "ingredients": ingredients,
+            "error": "AI_MODEL در فایل .env پیدا نشد."
         }
 
     try:
@@ -384,15 +462,16 @@ def analyze_ingredients(
 - تشخیص پزشکی نده.
 - ادعای درمان قطعی نکن.
 - درباره اثرات ترکیبات اغراق نکن.
-- اگر درباره یک ترکیب اطلاعات کافی نداری، صادقانه بگو.
-- اگر ماده‌ای می‌تواند برای پوست حساس تحریک‌کننده باشد،
-  آن را ذکر کن.
+- اگر درباره یک ترکیب اطلاعات کافی نداری،
+  صادقانه بگو.
+- اگر ماده‌ای می‌تواند برای پوست حساس
+  تحریک‌کننده باشد، آن را ذکر کن.
 - پاسخ فارسی باشد.
 - پاسخ را واضح و قابل فهم برای کاربر عادی بنویس.
 """
 
         response = llm_client.chat.completions.create(
-            model=SAROVI_MODEL,
+            model=AI_MODEL,
 
             messages=[
                 {
@@ -405,6 +484,7 @@ def analyze_ingredients(
 نه تشخیص بیماری و نه تجویز دارو.
 """
                 },
+
                 {
                     "role": "user",
                     "content": prompt
@@ -414,7 +494,12 @@ def analyze_ingredients(
             max_tokens=1200
         )
 
-        analysis = response.choices[0].message.content
+        analysis = (
+            response
+            .choices[0]
+            .message
+            .content
+        )
 
         return {
             "success": True,
@@ -458,8 +543,13 @@ def create_routine(
     # Normalize Inputs
     # ==========================================
 
-    skin = (skin_type or "").strip().lower()
-    hair = (hair_type or "").strip().lower()
+    skin = (
+        skin_type or ""
+    ).strip().lower()
+
+    hair = (
+        hair_type or ""
+    ).strip().lower()
 
     # ==========================================
     # Skin Routine
@@ -661,16 +751,18 @@ def create_routine(
 
     for day in range(1, days + 1):
 
-        routine.append({
-            "day": day,
+        routine.append(
+            {
+                "day": day,
 
-            "skin": {
-                "morning": morning_skin.copy(),
-                "night": night_skin.copy()
-            },
+                "skin": {
+                    "morning": morning_skin.copy(),
+                    "night": night_skin.copy()
+                },
 
-            "hair": hair_routine.copy()
-        })
+                "hair": hair_routine.copy()
+            }
+        )
 
     # ==========================================
     # Result
@@ -711,7 +803,8 @@ def safety_check(
     image_analysis: Optional[str] = None
 ):
     """
-    بررسی اولیه علائم هشدار در مشکلات پوست، مو و پوست سر.
+    بررسی اولیه علائم هشدار در مشکلات پوست،
+    مو و پوست سر.
 
     این تابع تشخیص پزشکی انجام نمی‌دهد.
     هدف آن شناسایی نشانه‌هایی است که ممکن است
@@ -812,7 +905,10 @@ def safety_check(
     combined_text = message
 
     if image_analysis:
-        combined_text += "\n" + image_analysis
+
+        combined_text += (
+            "\n" + image_analysis
+        )
 
     combined_text = combined_text.lower()
 
@@ -828,7 +924,9 @@ def safety_check(
 
             if keyword.lower() in combined_text:
 
-                detected.append(group_name)
+                detected.append(
+                    group_name
+                )
 
                 break
 

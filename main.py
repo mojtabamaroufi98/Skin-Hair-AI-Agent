@@ -111,7 +111,10 @@ async def agent(
             final_message,
             image_bytes=image_bytes,
             image_type=image_type,
-            user_id=user_id
+            user_id=user_id,
+            age=age,
+            skin_type=skin_type,
+            hair_type=hair_type
         )
 
 

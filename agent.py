@@ -22,24 +22,18 @@ from tools import (
 
 load_dotenv()
 
-api_key = os.getenv("SAROVI_API_KEY")
-
-base_url = os.getenv(
-    "SAROVI_BASE_URL",
-    "https://api.sarovi.ir/v1"
-)
-
-model = os.getenv(
-    "SAROVI_MODEL",
-    "anthropic/claude-sonnet-5"
-)
-
+api_key = os.getenv("AI_API_KEY")
+base_url = os.getenv("AI_BASE_URL")
+model = os.getenv("AI_MODEL")
 
 if not api_key:
-    raise ValueError(
-        "SAROVI_API_KEY در فایل .env پیدا نشد."
-    )
+    raise ValueError("AI_API_KEY در فایل .env پیدا نشد.")
 
+if not base_url:
+    raise ValueError("AI_BASE_URL در فایل .env پیدا نشد.")
+
+if not model:
+    raise ValueError("AI_MODEL در فایل .env پیدا نشد.")
 
 # ==========================================
 # Client
@@ -59,18 +53,21 @@ client = OpenAI(
 MAX_TOOL_ROUNDS = 5
 MAX_TOKENS = 1500
 
+MAX_HISTORY_MESSAGES = 8
+
 
 # ==========================================
-# Short Conversation Memory
+# Conversation Memory
 # ==========================================
-
-# حافظه موقت برای ادامه چند پیام اخیر گفتگو.
-# این حافظه با Restart شدن سرور پاک می‌شود.
 
 conversation_memory: dict[str, list[dict]] = {}
 
-# 6 پیام = حدود 3 رفت و برگشت اخیر
-MAX_HISTORY_MESSAGES = 6
+
+# ==========================================
+# User Profile Memory
+# ==========================================
+
+user_profiles: dict[str, dict] = {}
 
 
 # ==========================================
@@ -78,205 +75,121 @@ MAX_HISTORY_MESSAGES = 6
 # ==========================================
 
 TOOLS = [
-
-    # --------------------------------------
-    # Web Search
-    # --------------------------------------
-
     {
         "type": "function",
         "function": {
             "name": "search_web",
-
             "description": (
                 "جستجوی اطلاعات واقعی و به‌روز در وب درباره "
-                "پوست، مو، مراقبت پوستی، ترکیبات و موضوعات مرتبط. "
-                "فقط زمانی استفاده شود که اطلاعات به‌روز یا منبع واقعی لازم است."
+                "پوست، مو، مراقبت پوستی، ترکیبات و موضوعات مرتبط."
             ),
-
             "parameters": {
                 "type": "object",
-
                 "properties": {
                     "query": {
                         "type": "string",
                         "description": "عبارت مورد جستجو"
                     }
                 },
-
-                "required": [
-                    "query"
-                ]
+                "required": ["query"]
             }
         }
     },
-
-
-    # --------------------------------------
-    # Product Search
-    # --------------------------------------
 
     {
         "type": "function",
         "function": {
             "name": "search_products",
-
             "description": (
                 "جستجوی محصولات واقعی پوست و مو. "
                 "برای پیدا کردن محصول، برند، مشخصات، "
-                "قیمت یا لینک واقعی استفاده شود. "
-                "اطلاعات محصول نباید بدون نتیجه این ابزار ساخته شود."
+                "قیمت یا لینک واقعی استفاده شود."
             ),
-
             "parameters": {
                 "type": "object",
-
                 "properties": {
-
                     "query": {
                         "type": "string",
                         "description": "محصول مورد نظر"
                     },
-
                     "skin_type": {
                         "type": "string",
-                        "description": "نوع پوست در صورت مشخص بودن"
+                        "description": "نوع پوست"
                     },
-
                     "category": {
                         "type": "string",
                         "description": "دسته محصول"
                     }
                 },
-
-                "required": [
-                    "query"
-                ]
+                "required": ["query"]
             }
         }
     },
-
-
-    # --------------------------------------
-    # Ingredient Analysis
-    # --------------------------------------
 
     {
         "type": "function",
         "function": {
             "name": "analyze_ingredients",
-
             "description": (
-                "تحلیل ترکیبات محصولات پوست و مو. "
-                "زمانی استفاده شود که کاربر لیست ترکیبات "
-                "یک محصول را ارائه کرده یا درخواست تحلیل آنها را دارد."
+                "تحلیل ترکیبات محصولات پوست و مو."
             ),
-
             "parameters": {
                 "type": "object",
-
                 "properties": {
-
                     "ingredients": {
                         "type": "string",
-                        "description": "فهرست ترکیبات محصول"
+                        "description": "فهرست ترکیبات"
                     }
                 },
-
-                "required": [
-                    "ingredients"
-                ]
+                "required": ["ingredients"]
             }
         }
     },
-
-
-    # --------------------------------------
-    # Routine Planner
-    # --------------------------------------
 
     {
         "type": "function",
         "function": {
             "name": "create_routine",
-
             "description": (
-                "ساخت چارچوب برنامه مراقبت از پوست و مو. "
-                "برای درخواست برنامه‌های 3، 7، 14 یا 30 روزه استفاده شود."
+                "ساخت برنامه مراقبت از پوست و مو."
             ),
-
             "parameters": {
                 "type": "object",
-
                 "properties": {
-
                     "skin_type": {
-                        "type": "string",
-                        "description": "نوع پوست کاربر"
+                        "type": "string"
                     },
-
                     "hair_type": {
-                        "type": "string",
-                        "description": "نوع موی کاربر"
+                        "type": "string"
                     },
-
                     "days": {
                         "type": "integer",
-                        "enum": [
-                            3,
-                            7,
-                            14,
-                            30
-                        ],
-                        "description": "تعداد روزهای برنامه"
+                        "enum": [3, 7, 14, 30]
                     }
                 },
-
                 "required": []
             }
         }
     },
 
-
-    # --------------------------------------
-    # Safety Check
-    # --------------------------------------
-
     {
         "type": "function",
         "function": {
             "name": "safety_check",
-
             "description": (
-                "بررسی علائم هشدار پوست، مو و پوست سر. "
-                "اگر کاربر از درد شدید، خونریزی، زخم، "
-                "عفونت، تورم شدید، واکنش شدید، "
-                "ریزش ناگهانی مو یا علائم غیرعادی صحبت کرد "
-                "از این ابزار استفاده شود."
+                "بررسی علائم هشدار پوست، مو و پوست سر."
             ),
-
             "parameters": {
                 "type": "object",
-
                 "properties": {
-
                     "message": {
-                        "type": "string",
-                        "description": "شرح علائم یا سؤال کاربر"
+                        "type": "string"
                     },
-
                     "image_analysis": {
-                        "type": "string",
-                        "description": (
-                            "توضیح ویژگی‌های قابل مشاهده تصویر "
-                            "در صورت وجود"
-                        )
+                        "type": "string"
                     }
                 },
-
-                "required": [
-                    "message"
-                ]
+                "required": ["message"]
             }
         }
     }
@@ -287,131 +200,77 @@ TOOLS = [
 # Execute Tool
 # ==========================================
 
-def execute_tool(
-    tool_name: str,
-    arguments: dict
-):
+def execute_tool(tool_name: str, arguments: dict):
 
     if tool_name == "search_web":
-
         return search_web(
-            query=arguments.get(
-                "query",
-                ""
-            )
+            query=arguments.get("query", "")
         )
-
 
     if tool_name == "search_products":
-
         return search_products(
-            query=arguments.get(
-                "query",
-                ""
-            ),
-
-            skin_type=arguments.get(
-                "skin_type"
-            ),
-
-            category=arguments.get(
-                "category"
-            )
+            query=arguments.get("query", ""),
+            skin_type=arguments.get("skin_type"),
+            category=arguments.get("category")
         )
-
 
     if tool_name == "analyze_ingredients":
-
         return analyze_ingredients(
-            ingredients=arguments.get(
-                "ingredients",
-                ""
-            )
+            ingredients=arguments.get("ingredients", "")
         )
-
 
     if tool_name == "create_routine":
-
         return create_routine(
-            skin_type=arguments.get(
-                "skin_type"
-            ),
-
-            hair_type=arguments.get(
-                "hair_type"
-            ),
-
-            days=arguments.get(
-                "days",
-                7
-            )
+            skin_type=arguments.get("skin_type"),
+            hair_type=arguments.get("hair_type"),
+            days=arguments.get("days", 7)
         )
-
 
     if tool_name == "safety_check":
-
         return safety_check(
-            message=arguments.get(
-                "message",
-                ""
-            ),
-
-            image_analysis=arguments.get(
-                "image_analysis"
-            )
+            message=arguments.get("message", ""),
+            image_analysis=arguments.get("image_analysis")
         )
-
 
     return {
         "success": False,
-        "tool": tool_name,
         "error": f"Unknown tool: {tool_name}"
     }
 
 
 # ==========================================
-# Convert Assistant Message
+# Assistant Message Converter
 # ==========================================
 
-def assistant_message_to_dict(
-    assistant_message
-):
+def assistant_message_to_dict(assistant_message):
 
-    message_dict = {
+    result = {
         "role": "assistant",
         "content": assistant_message.content
     }
 
-
     if assistant_message.tool_calls:
 
-        message_dict["tool_calls"] = []
-
+        result["tool_calls"] = []
 
         for tool_call in assistant_message.tool_calls:
 
-            message_dict["tool_calls"].append(
+            result["tool_calls"].append(
                 {
                     "id": tool_call.id,
-
                     "type": "function",
-
                     "function": {
                         "name": tool_call.function.name,
-
-                        "arguments": (
-                            tool_call.function.arguments
-                        )
+                        "arguments": tool_call.function.arguments
                     }
                 }
             )
 
-
-    return message_dict
+    return result
 
 
 # ==========================================
-# Save Conversation
+# Conversation Memory
 # ==========================================
 
 def save_conversation(
@@ -423,11 +282,8 @@ def save_conversation(
     if not user_id:
         return
 
-
     if user_id not in conversation_memory:
-
         conversation_memory[user_id] = []
-
 
     conversation_memory[user_id].append(
         {
@@ -436,7 +292,6 @@ def save_conversation(
         }
     )
 
-
     conversation_memory[user_id].append(
         {
             "role": "assistant",
@@ -444,18 +299,11 @@ def save_conversation(
         }
     )
 
-
-    # فقط چند پیام اخیر نگه داشته شوند
     conversation_memory[user_id] = (
-        conversation_memory[user_id][
-            -MAX_HISTORY_MESSAGES:
-        ]
+        conversation_memory[user_id]
+        [-MAX_HISTORY_MESSAGES:]
     )
 
-
-# ==========================================
-# Get Conversation History
-# ==========================================
 
 def get_conversation_history(
     user_id: str | None
@@ -464,11 +312,79 @@ def get_conversation_history(
     if not user_id:
         return []
 
-
     return conversation_memory.get(
         user_id,
         []
     )[-MAX_HISTORY_MESSAGES:]
+
+
+# ==========================================
+# User Profile Memory
+# ==========================================
+
+def update_user_profile(
+    user_id: str | None,
+    age=None,
+    skin_type=None,
+    hair_type=None
+):
+
+    if not user_id:
+        return
+
+    if user_id not in user_profiles:
+        user_profiles[user_id] = {}
+
+    profile = user_profiles[user_id]
+
+    if age is not None:
+        profile["age"] = age
+
+    if skin_type:
+        profile["skin_type"] = skin_type
+
+    if hair_type:
+        profile["hair_type"] = hair_type
+
+
+def get_user_profile(
+    user_id: str | None
+):
+
+    if not user_id:
+        return {}
+
+    return user_profiles.get(
+        user_id,
+        {}
+    )
+
+
+# ==========================================
+# Build Profile Context
+# ==========================================
+
+def build_profile_context(
+    user_id: str | None
+):
+
+    profile = get_user_profile(user_id)
+
+    if not profile:
+        return ""
+
+    context = "\n\nاطلاعات ذخیره‌شده کاربر:\n"
+
+    if profile.get("age") is not None:
+        context += f"- سن: {profile['age']}\n"
+
+    if profile.get("skin_type"):
+        context += f"- نوع پوست: {profile['skin_type']}\n"
+
+    if profile.get("hair_type"):
+        context += f"- نوع مو: {profile['hair_type']}\n"
+
+    return context
 
 
 # ==========================================
@@ -479,13 +395,27 @@ def run_agent(
     message: str,
     image_bytes: bytes | None = None,
     image_type: str | None = None,
-    user_id: str | None = None
+    user_id: str | None = None,
+    age: int | None = None,
+    skin_type: str | None = None,
+    hair_type: str | None = None
 ):
 
     try:
 
         # ======================================
-        # Current User Content
+        # Update User Profile
+        # ======================================
+
+        update_user_profile(
+            user_id=user_id,
+            age=age,
+            skin_type=skin_type,
+            hair_type=hair_type
+        )
+
+        # ======================================
+        # User Content
         # ======================================
 
         user_content = [
@@ -495,7 +425,6 @@ def run_agent(
             }
         ]
 
-
         # ======================================
         # Image
         # ======================================
@@ -504,22 +433,16 @@ def run_agent(
 
             image_base64 = base64.b64encode(
                 image_bytes
-            ).decode(
-                "utf-8"
-            )
-
+            ).decode("utf-8")
 
             mime_type = (
                 image_type
-                or
-                "image/jpeg"
+                or "image/jpeg"
             )
-
 
             user_content.append(
                 {
                     "type": "image_url",
-
                     "image_url": {
                         "url": (
                             f"data:{mime_type};"
@@ -528,7 +451,6 @@ def run_agent(
                     }
                 }
             )
-
 
         # ======================================
         # Messages
@@ -541,6 +463,22 @@ def run_agent(
             }
         ]
 
+        # ======================================
+        # Profile Context
+        # ======================================
+
+        profile_context = build_profile_context(
+            user_id
+        )
+
+        if profile_context:
+
+            messages.append(
+                {
+                    "role": "system",
+                    "content": profile_context
+                }
+            )
 
         # ======================================
         # Previous Conversation
@@ -550,11 +488,7 @@ def run_agent(
             user_id
         )
 
-
-        messages.extend(
-            history
-        )
-
+        messages.extend(history)
 
         # ======================================
         # Current User Message
@@ -567,9 +501,8 @@ def run_agent(
             }
         )
 
-
         # ======================================
-        # Multi-Step Agent Loop
+        # Agent Loop
         # ======================================
 
         for round_number in range(
@@ -579,44 +512,28 @@ def run_agent(
 
             print("\n")
             print("=" * 60)
-
-            print(
-                f"AGENT ROUND {round_number}"
-            )
-
+            print(f"AGENT ROUND {round_number}")
             print("=" * 60)
 
-
-            response = (
-                client.chat.completions.create(
-                    model=model,
-
-                    messages=messages,
-
-                    tools=TOOLS,
-
-                    tool_choice="auto",
-
-                    max_tokens=MAX_TOKENS
-                )
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                tools=TOOLS,
+                tool_choice="auto",
+                max_tokens=MAX_TOKENS
             )
-
 
             choice = response.choices[0]
 
-            assistant_message = (
-                choice.message
-            )
-
+            assistant_message = choice.message
 
             print(
                 "FINISH REASON:",
                 choice.finish_reason
             )
 
-
             # ==================================
-            # No Tool Call -> Final Answer
+            # Final Answer
             # ==================================
 
             if not assistant_message.tool_calls:
@@ -625,7 +542,6 @@ def run_agent(
                     assistant_message.content
                 )
 
-
                 if not final_answer:
 
                     return (
@@ -633,32 +549,17 @@ def run_agent(
                         "دریافت نشد."
                     )
 
-
-                print(
-                    "NO MORE TOOLS REQUIRED"
-                )
-
-
-                # ------------------------------
-                # Save Conversation
-                # ------------------------------
-
                 save_conversation(
                     user_id=user_id,
                     user_message=message,
                     assistant_message=final_answer
                 )
 
-
                 return final_answer
-
 
             # ==================================
             # Tool Calls
             # ==================================
-
-            print("\nTOOLS CALLED:")
-
 
             messages.append(
                 assistant_message_to_dict(
@@ -666,48 +567,32 @@ def run_agent(
                 )
             )
 
-
-            for tool_call in (
-                assistant_message.tool_calls
-            ):
+            for tool_call in assistant_message.tool_calls:
 
                 tool_name = (
                     tool_call.function.name
                 )
 
-
-                # ------------------------------
-                # Parse Arguments
-                # ------------------------------
-
                 try:
 
                     arguments = json.loads(
                         tool_call.function.arguments
-                        or
-                        "{}"
+                        or "{}"
                     )
 
                 except json.JSONDecodeError:
 
                     arguments = {}
 
-
                 print(
-                    "\nTOOL:",
+                    "TOOL:",
                     tool_name
                 )
-
 
                 print(
                     "ARGUMENTS:",
                     arguments
                 )
-
-
-                # ------------------------------
-                # Execute Tool
-                # ------------------------------
 
                 try:
 
@@ -720,33 +605,13 @@ def run_agent(
 
                     tool_result = {
                         "success": False,
-                        "tool": tool_name,
-                        "error": str(
-                            tool_error
-                        )
+                        "error": str(tool_error)
                     }
-
-
-                print(
-                    "TOOL SUCCESS:",
-                    tool_result.get(
-                        "success"
-                    )
-                )
-
-
-                # ------------------------------
-                # Add Tool Result
-                # ------------------------------
 
                 messages.append(
                     {
                         "role": "tool",
-
-                        "tool_call_id": (
-                            tool_call.id
-                        ),
-
+                        "tool_call_id": tool_call.id,
                         "content": json.dumps(
                             tool_result,
                             ensure_ascii=False
@@ -754,32 +619,15 @@ def run_agent(
                     }
                 )
 
-
         # ======================================
-        # Maximum Tool Rounds Reached
+        # Final Attempt
         # ======================================
 
-        print("\n")
-        print("=" * 60)
-
-        print(
-            "MAX TOOL ROUNDS REACHED"
+        final_response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            max_tokens=MAX_TOKENS
         )
-
-        print("=" * 60)
-
-
-        # درخواست نهایی بدون Tools
-        final_response = (
-            client.chat.completions.create(
-                model=model,
-
-                messages=messages,
-
-                max_tokens=MAX_TOKENS
-            )
-        )
-
 
         final_answer = (
             final_response
@@ -788,12 +636,7 @@ def run_agent(
             .content
         )
 
-
         if final_answer:
-
-            # ------------------------------
-            # Save Conversation
-            # ------------------------------
 
             save_conversation(
                 user_id=user_id,
@@ -801,36 +644,16 @@ def run_agent(
                 assistant_message=final_answer
             )
 
-
             return final_answer
 
-
         return (
-            "Agent نتوانست پاسخ نهایی "
-            "مناسبی تولید کند."
+            "Agent نتوانست پاسخ مناسبی تولید کند."
         )
-
-
-    # ==========================================
-    # Agent Error
-    # ==========================================
 
     except Exception as e:
 
-        print("\n")
-        print("=" * 60)
-
-        print(
-            "AGENT ERROR"
-        )
-
-        print("=" * 60)
-
-
-        print(
-            repr(e)
-        )
-
+        print("\nAGENT ERROR:")
+        print(repr(e))
 
         return (
             "متأسفانه هنگام پردازش درخواست شما "
