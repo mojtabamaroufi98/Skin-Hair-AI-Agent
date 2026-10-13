@@ -23,10 +23,12 @@ from tools import (
 load_dotenv()
 
 api_key = os.getenv("SAROVI_API_KEY")
+
 base_url = os.getenv(
     "SAROVI_BASE_URL",
     "https://api.sarovi.ir/v1"
 )
+
 model = os.getenv(
     "SAROVI_MODEL",
     "anthropic/claude-sonnet-5"
@@ -36,16 +38,6 @@ model = os.getenv(
 if not api_key:
     raise ValueError(
         "SAROVI_API_KEY در فایل .env پیدا نشد."
-    )
-
-if not base_url:
-    raise ValueError(
-        "SAROVI_BASE_URL در فایل .env پیدا نشد."
-    )
-
-if not model:
-    raise ValueError(
-        "SAROVI_MODEL در فایل .env پیدا نشد."
     )
 
 
@@ -66,6 +58,19 @@ client = OpenAI(
 
 MAX_TOOL_ROUNDS = 5
 MAX_TOKENS = 1500
+
+
+# ==========================================
+# Short Conversation Memory
+# ==========================================
+
+# حافظه موقت برای ادامه چند پیام اخیر گفتگو.
+# این حافظه با Restart شدن سرور پاک می‌شود.
+
+conversation_memory: dict[str, list[dict]] = {}
+
+# 6 پیام = حدود 3 رفت و برگشت اخیر
+MAX_HISTORY_MESSAGES = 6
 
 
 # ==========================================
@@ -296,6 +301,7 @@ def execute_tool(
             )
         )
 
+
     if tool_name == "search_products":
 
         return search_products(
@@ -303,13 +309,16 @@ def execute_tool(
                 "query",
                 ""
             ),
+
             skin_type=arguments.get(
                 "skin_type"
             ),
+
             category=arguments.get(
                 "category"
             )
         )
+
 
     if tool_name == "analyze_ingredients":
 
@@ -320,20 +329,24 @@ def execute_tool(
             )
         )
 
+
     if tool_name == "create_routine":
 
         return create_routine(
             skin_type=arguments.get(
                 "skin_type"
             ),
+
             hair_type=arguments.get(
                 "hair_type"
             ),
+
             days=arguments.get(
                 "days",
                 7
             )
         )
+
 
     if tool_name == "safety_check":
 
@@ -342,10 +355,12 @@ def execute_tool(
                 "message",
                 ""
             ),
+
             image_analysis=arguments.get(
                 "image_analysis"
             )
         )
+
 
     return {
         "success": False,
@@ -367,9 +382,11 @@ def assistant_message_to_dict(
         "content": assistant_message.content
     }
 
+
     if assistant_message.tool_calls:
 
         message_dict["tool_calls"] = []
+
 
         for tool_call in assistant_message.tool_calls:
 
@@ -389,7 +406,69 @@ def assistant_message_to_dict(
                 }
             )
 
+
     return message_dict
+
+
+# ==========================================
+# Save Conversation
+# ==========================================
+
+def save_conversation(
+    user_id: str | None,
+    user_message: str,
+    assistant_message: str
+):
+
+    if not user_id:
+        return
+
+
+    if user_id not in conversation_memory:
+
+        conversation_memory[user_id] = []
+
+
+    conversation_memory[user_id].append(
+        {
+            "role": "user",
+            "content": user_message
+        }
+    )
+
+
+    conversation_memory[user_id].append(
+        {
+            "role": "assistant",
+            "content": assistant_message
+        }
+    )
+
+
+    # فقط چند پیام اخیر نگه داشته شوند
+    conversation_memory[user_id] = (
+        conversation_memory[user_id][
+            -MAX_HISTORY_MESSAGES:
+        ]
+    )
+
+
+# ==========================================
+# Get Conversation History
+# ==========================================
+
+def get_conversation_history(
+    user_id: str | None
+):
+
+    if not user_id:
+        return []
+
+
+    return conversation_memory.get(
+        user_id,
+        []
+    )[-MAX_HISTORY_MESSAGES:]
 
 
 # ==========================================
@@ -399,13 +478,14 @@ def assistant_message_to_dict(
 def run_agent(
     message: str,
     image_bytes: bytes | None = None,
-    image_type: str | None = None
+    image_type: str | None = None,
+    user_id: str | None = None
 ):
 
     try:
 
         # ======================================
-        # User Content
+        # Current User Content
         # ======================================
 
         user_content = [
@@ -428,11 +508,13 @@ def run_agent(
                 "utf-8"
             )
 
+
             mime_type = (
                 image_type
                 or
                 "image/jpeg"
             )
+
 
             user_content.append(
                 {
@@ -453,17 +535,37 @@ def run_agent(
         # ======================================
 
         messages = [
-
             {
                 "role": "system",
                 "content": system_prompt
-            },
+            }
+        ]
 
+
+        # ======================================
+        # Previous Conversation
+        # ======================================
+
+        history = get_conversation_history(
+            user_id
+        )
+
+
+        messages.extend(
+            history
+        )
+
+
+        # ======================================
+        # Current User Message
+        # ======================================
+
+        messages.append(
             {
                 "role": "user",
                 "content": user_content
             }
-        ]
+        )
 
 
         # ======================================
@@ -477,24 +579,35 @@ def run_agent(
 
             print("\n")
             print("=" * 60)
+
             print(
                 f"AGENT ROUND {round_number}"
             )
+
             print("=" * 60)
+
 
             response = (
                 client.chat.completions.create(
                     model=model,
+
                     messages=messages,
+
                     tools=TOOLS,
+
                     tool_choice="auto",
+
                     max_tokens=MAX_TOKENS
                 )
             )
 
+
             choice = response.choices[0]
 
-            assistant_message = choice.message
+            assistant_message = (
+                choice.message
+            )
+
 
             print(
                 "FINISH REASON:",
@@ -512,6 +625,7 @@ def run_agent(
                     assistant_message.content
                 )
 
+
                 if not final_answer:
 
                     return (
@@ -519,9 +633,22 @@ def run_agent(
                         "دریافت نشد."
                     )
 
+
                 print(
                     "NO MORE TOOLS REQUIRED"
                 )
+
+
+                # ------------------------------
+                # Save Conversation
+                # ------------------------------
+
+                save_conversation(
+                    user_id=user_id,
+                    user_message=message,
+                    assistant_message=final_answer
+                )
+
 
                 return final_answer
 
@@ -531,6 +658,7 @@ def run_agent(
             # ==================================
 
             print("\nTOOLS CALLED:")
+
 
             messages.append(
                 assistant_message_to_dict(
@@ -570,6 +698,7 @@ def run_agent(
                     tool_name
                 )
 
+
                 print(
                     "ARGUMENTS:",
                     arguments
@@ -577,7 +706,7 @@ def run_agent(
 
 
                 # ------------------------------
-                # Execute
+                # Execute Tool
                 # ------------------------------
 
                 try:
@@ -632,20 +761,21 @@ def run_agent(
 
         print("\n")
         print("=" * 60)
+
         print(
             "MAX TOOL ROUNDS REACHED"
         )
+
         print("=" * 60)
 
 
-        # One final request without tools.
-        # Model must answer using information
-        # already collected.
-
+        # درخواست نهایی بدون Tools
         final_response = (
             client.chat.completions.create(
                 model=model,
+
                 messages=messages,
+
                 max_tokens=MAX_TOKENS
             )
         )
@@ -660,6 +790,17 @@ def run_agent(
 
 
         if final_answer:
+
+            # ------------------------------
+            # Save Conversation
+            # ------------------------------
+
+            save_conversation(
+                user_id=user_id,
+                user_message=message,
+                assistant_message=final_answer
+            )
+
 
             return final_answer
 
@@ -678,12 +819,18 @@ def run_agent(
 
         print("\n")
         print("=" * 60)
-        print("AGENT ERROR")
+
+        print(
+            "AGENT ERROR"
+        )
+
         print("=" * 60)
+
 
         print(
             repr(e)
         )
+
 
         return (
             "متأسفانه هنگام پردازش درخواست شما "

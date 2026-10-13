@@ -110,7 +110,8 @@ async def agent(
         answer = run_agent(
             final_message,
             image_bytes=image_bytes,
-            image_type=image_type
+            image_type=image_type,
+            user_id=user_id
         )
 
 
