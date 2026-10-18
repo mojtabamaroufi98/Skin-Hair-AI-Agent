@@ -12,6 +12,7 @@ from tools import (
     search_products,
     analyze_ingredients,
     create_routine,
+    create_home_mask,
     safety_check
 )
 
@@ -27,13 +28,20 @@ base_url = os.getenv("AI_BASE_URL")
 model = os.getenv("AI_MODEL")
 
 if not api_key:
-    raise ValueError("AI_API_KEY در فایل .env پیدا نشد.")
+    raise ValueError(
+        "AI_API_KEY در فایل .env پیدا نشد."
+    )
 
 if not base_url:
-    raise ValueError("AI_BASE_URL در فایل .env پیدا نشد.")
+    raise ValueError(
+        "AI_BASE_URL در فایل .env پیدا نشد."
+    )
 
 if not model:
-    raise ValueError("AI_MODEL در فایل .env پیدا نشد.")
+    raise ValueError(
+        "AI_MODEL در فایل .env پیدا نشد."
+    )
+
 
 # ==========================================
 # Client
@@ -75,6 +83,11 @@ user_profiles: dict[str, dict] = {}
 # ==========================================
 
 TOOLS = [
+
+    # ======================================
+    # Web Search
+    # ======================================
+
     {
         "type": "function",
         "function": {
@@ -95,6 +108,10 @@ TOOLS = [
             }
         }
     },
+
+    # ======================================
+    # Product Search
+    # ======================================
 
     {
         "type": "function",
@@ -126,6 +143,10 @@ TOOLS = [
         }
     },
 
+    # ======================================
+    # Ingredient Analysis
+    # ======================================
+
     {
         "type": "function",
         "function": {
@@ -146,31 +167,106 @@ TOOLS = [
         }
     },
 
+    # ======================================
+    # Routine
+    # ======================================
+
     {
         "type": "function",
         "function": {
             "name": "create_routine",
             "description": (
-                "ساخت برنامه مراقبت از پوست و مو."
+                "ساخت برنامه مراقبت شخصی‌سازی‌شده "
+                "برای پوست و مو."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "skin_type": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "نوع پوست کاربر"
                     },
                     "hair_type": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "نوع مو کاربر"
                     },
                     "days": {
                         "type": "integer",
-                        "enum": [3, 7, 14, 30]
+                        "enum": [3, 7, 14, 30],
+                        "description": "تعداد روزهای برنامه"
                     }
                 },
                 "required": []
             }
         }
     },
+
+    # ======================================
+    # Home Mask
+    # ======================================
+
+    {
+        "type": "function",
+        "function": {
+            "name": "create_home_mask",
+            "description": (
+                "پیشنهاد ماسک خانگی ساده و کم‌ریسک "
+                "بر اساس پروفایل کاربر، نوع پوست، "
+                "نوع مو، پوست سر، حساسیت‌ها، نگرانی‌ها "
+                "و هدف کاربر. "
+                "در صورت وجود آلرژی نباید ماده حساسیت‌زا "
+                "پیشنهاد شود."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+
+                    "category": {
+                        "type": "string",
+                        "description": (
+                            "دسته مورد نظر؛ مثلاً پوست، "
+                            "مو یا پوست سر"
+                        )
+                    },
+
+                    "skin_type": {
+                        "type": "string",
+                        "description": "نوع پوست"
+                    },
+
+                    "hair_type": {
+                        "type": "string",
+                        "description": "نوع مو"
+                    },
+
+                    "scalp_type": {
+                        "type": "string",
+                        "description": "نوع پوست سر"
+                    },
+
+                    "allergies": {
+                        "type": "string",
+                        "description": "آلرژی‌ها یا حساسیت‌های کاربر"
+                    },
+
+                    "concerns": {
+                        "type": "string",
+                        "description": "نگرانی‌ها یا مشکلات موردنظر"
+                    },
+
+                    "goal": {
+                        "type": "string",
+                        "description": "هدف کاربر"
+                    }
+                },
+                "required": []
+            }
+        }
+    },
+
+    # ======================================
+    # Safety Check
+    # ======================================
 
     {
         "type": "function",
@@ -200,37 +296,137 @@ TOOLS = [
 # Execute Tool
 # ==========================================
 
-def execute_tool(tool_name: str, arguments: dict):
+def execute_tool(
+    tool_name: str,
+    arguments: dict
+):
+
+    # ======================================
+    # Web Search
+    # ======================================
 
     if tool_name == "search_web":
+
         return search_web(
-            query=arguments.get("query", "")
+            query=arguments.get(
+                "query",
+                ""
+            )
         )
+
+
+    # ======================================
+    # Product Search
+    # ======================================
 
     if tool_name == "search_products":
+
         return search_products(
-            query=arguments.get("query", ""),
-            skin_type=arguments.get("skin_type"),
-            category=arguments.get("category")
+            query=arguments.get(
+                "query",
+                ""
+            ),
+            skin_type=arguments.get(
+                "skin_type"
+            ),
+            category=arguments.get(
+                "category"
+            )
         )
+
+
+    # ======================================
+    # Ingredient Analysis
+    # ======================================
 
     if tool_name == "analyze_ingredients":
+
         return analyze_ingredients(
-            ingredients=arguments.get("ingredients", "")
+            ingredients=arguments.get(
+                "ingredients",
+                ""
+            )
         )
+
+
+    # ======================================
+    # Routine
+    # ======================================
 
     if tool_name == "create_routine":
+
         return create_routine(
-            skin_type=arguments.get("skin_type"),
-            hair_type=arguments.get("hair_type"),
-            days=arguments.get("days", 7)
+            skin_type=arguments.get(
+                "skin_type"
+            ),
+            hair_type=arguments.get(
+                "hair_type"
+            ),
+            days=arguments.get(
+                "days",
+                7
+            )
         )
 
-    if tool_name == "safety_check":
-        return safety_check(
-            message=arguments.get("message", ""),
-            image_analysis=arguments.get("image_analysis")
+
+    # ======================================
+    # Home Mask
+    # ======================================
+
+    if tool_name == "create_home_mask":
+
+        return create_home_mask(
+
+            category=arguments.get(
+                "category"
+            ),
+
+            skin_type=arguments.get(
+                "skin_type"
+            ),
+
+            hair_type=arguments.get(
+                "hair_type"
+            ),
+
+            scalp_type=arguments.get(
+                "scalp_type"
+            ),
+
+            allergies=arguments.get(
+                "allergies"
+            ),
+
+            concerns=arguments.get(
+                "concerns"
+            ),
+
+            goal=arguments.get(
+                "goal"
+            )
         )
+
+
+    # ======================================
+    # Safety Check
+    # ======================================
+
+    if tool_name == "safety_check":
+
+        return safety_check(
+            message=arguments.get(
+                "message",
+                ""
+            ),
+            image_analysis=arguments.get(
+                "image_analysis"
+            )
+        )
+
+
+    # ======================================
+    # Unknown Tool
+    # ======================================
 
     return {
         "success": False,
@@ -242,7 +438,9 @@ def execute_tool(tool_name: str, arguments: dict):
 # Assistant Message Converter
 # ==========================================
 
-def assistant_message_to_dict(assistant_message):
+def assistant_message_to_dict(
+    assistant_message
+):
 
     result = {
         "role": "assistant",
@@ -283,7 +481,9 @@ def save_conversation(
         return
 
     if user_id not in conversation_memory:
+
         conversation_memory[user_id] = []
+
 
     conversation_memory[user_id].append(
         {
@@ -292,12 +492,14 @@ def save_conversation(
         }
     )
 
+
     conversation_memory[user_id].append(
         {
             "role": "assistant",
             "content": assistant_message
         }
     )
+
 
     conversation_memory[user_id] = (
         conversation_memory[user_id]
@@ -310,7 +512,9 @@ def get_conversation_history(
 ):
 
     if not user_id:
+
         return []
+
 
     return conversation_memory.get(
         user_id,
@@ -324,27 +528,78 @@ def get_conversation_history(
 
 def update_user_profile(
     user_id: str | None,
+    name=None,
     age=None,
+    gender=None,
     skin_type=None,
-    hair_type=None
+    hair_type=None,
+    scalp_type=None,
+    allergies=None,
+    concerns=None,
+    goal=None,
+    products=None
 ):
 
     if not user_id:
         return
 
+
     if user_id not in user_profiles:
+
         user_profiles[user_id] = {}
+
 
     profile = user_profiles[user_id]
 
+
+    if name is not None and str(name).strip():
+
+        profile["name"] = name
+
+
     if age is not None:
+
         profile["age"] = age
 
-    if skin_type:
+
+    if gender is not None and str(gender).strip():
+
+        profile["gender"] = gender
+
+
+    if skin_type is not None and str(skin_type).strip():
+
         profile["skin_type"] = skin_type
 
-    if hair_type:
+
+    if hair_type is not None and str(hair_type).strip():
+
         profile["hair_type"] = hair_type
+
+
+    if scalp_type is not None and str(scalp_type).strip():
+
+        profile["scalp_type"] = scalp_type
+
+
+    if allergies is not None and str(allergies).strip():
+
+        profile["allergies"] = allergies
+
+
+    if concerns is not None and str(concerns).strip():
+
+        profile["concerns"] = concerns
+
+
+    if goal is not None and str(goal).strip():
+
+        profile["goal"] = goal
+
+
+    if products is not None and str(products).strip():
+
+        profile["products"] = products
 
 
 def get_user_profile(
@@ -352,7 +607,9 @@ def get_user_profile(
 ):
 
     if not user_id:
+
         return {}
+
 
     return user_profiles.get(
         user_id,
@@ -368,21 +625,101 @@ def build_profile_context(
     user_id: str | None
 ):
 
-    profile = get_user_profile(user_id)
+    profile = get_user_profile(
+        user_id
+    )
+
 
     if not profile:
+
         return ""
 
-    context = "\n\nاطلاعات ذخیره‌شده کاربر:\n"
+
+    context = (
+        "\n\n"
+        "اطلاعات ذخیره‌شده کاربر:\n"
+    )
+
+
+    if profile.get("name"):
+
+        context += (
+            f"- نام: "
+            f"{profile['name']}\n"
+        )
+
 
     if profile.get("age") is not None:
-        context += f"- سن: {profile['age']}\n"
+
+        context += (
+            f"- سن: "
+            f"{profile['age']}\n"
+        )
+
+
+    if profile.get("gender"):
+
+        context += (
+            f"- جنسیت: "
+            f"{profile['gender']}\n"
+        )
+
 
     if profile.get("skin_type"):
-        context += f"- نوع پوست: {profile['skin_type']}\n"
+
+        context += (
+            f"- نوع پوست: "
+            f"{profile['skin_type']}\n"
+        )
+
 
     if profile.get("hair_type"):
-        context += f"- نوع مو: {profile['hair_type']}\n"
+
+        context += (
+            f"- نوع مو: "
+            f"{profile['hair_type']}\n"
+        )
+
+
+    if profile.get("scalp_type"):
+
+        context += (
+            f"- نوع پوست سر: "
+            f"{profile['scalp_type']}\n"
+        )
+
+
+    if profile.get("allergies"):
+
+        context += (
+            f"- حساسیت‌ها / آلرژی‌ها: "
+            f"{profile['allergies']}\n"
+        )
+
+
+    if profile.get("concerns"):
+
+        context += (
+            f"- نگرانی‌ها و مشکلات موردنظر: "
+            f"{profile['concerns']}\n"
+        )
+
+
+    if profile.get("goal"):
+
+        context += (
+            f"- هدف کاربر: "
+            f"{profile['goal']}\n"
+        )
+
+
+    if profile.get("products"):
+
+        context += (
+            f"- محصولات فعلی: "
+            f"{profile['products']}\n"
+        )
+
 
     return context
 
@@ -393,12 +730,22 @@ def build_profile_context(
 
 def run_agent(
     message: str,
+
     image_bytes: bytes | None = None,
     image_type: str | None = None,
+
     user_id: str | None = None,
+
+    name: str | None = None,
     age: int | None = None,
+    gender: str | None = None,
     skin_type: str | None = None,
-    hair_type: str | None = None
+    hair_type: str | None = None,
+    scalp_type: str | None = None,
+    allergies: str | None = None,
+    concerns: str | None = None,
+    goal: str | None = None,
+    products: str | None = None
 ):
 
     try:
@@ -408,11 +755,21 @@ def run_agent(
         # ======================================
 
         update_user_profile(
+
             user_id=user_id,
+
+            name=name,
             age=age,
+            gender=gender,
             skin_type=skin_type,
-            hair_type=hair_type
+            hair_type=hair_type,
+            scalp_type=scalp_type,
+            allergies=allergies,
+            concerns=concerns,
+            goal=goal,
+            products=products
         )
+
 
         # ======================================
         # User Content
@@ -425,6 +782,7 @@ def run_agent(
             }
         ]
 
+
         # ======================================
         # Image
         # ======================================
@@ -435,10 +793,12 @@ def run_agent(
                 image_bytes
             ).decode("utf-8")
 
+
             mime_type = (
                 image_type
                 or "image/jpeg"
             )
+
 
             user_content.append(
                 {
@@ -452,6 +812,7 @@ def run_agent(
                 }
             )
 
+
         # ======================================
         # Messages
         # ======================================
@@ -463,13 +824,17 @@ def run_agent(
             }
         ]
 
+
         # ======================================
         # Profile Context
         # ======================================
 
-        profile_context = build_profile_context(
-            user_id
+        profile_context = (
+            build_profile_context(
+                user_id
+            )
         )
+
 
         if profile_context:
 
@@ -480,15 +845,20 @@ def run_agent(
                 }
             )
 
+
         # ======================================
         # Previous Conversation
         # ======================================
 
-        history = get_conversation_history(
-            user_id
+        history = (
+            get_conversation_history(
+                user_id
+            )
         )
 
+
         messages.extend(history)
+
 
         # ======================================
         # Current User Message
@@ -501,6 +871,7 @@ def run_agent(
             }
         )
 
+
         # ======================================
         # Agent Loop
         # ======================================
@@ -512,25 +883,36 @@ def run_agent(
 
             print("\n")
             print("=" * 60)
-            print(f"AGENT ROUND {round_number}")
+            print(
+                f"AGENT ROUND {round_number}"
+            )
             print("=" * 60)
 
-            response = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                tools=TOOLS,
-                tool_choice="auto",
-                max_tokens=MAX_TOKENS
+
+            response = (
+                client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    tools=TOOLS,
+                    tool_choice="auto",
+                    max_tokens=MAX_TOKENS
+                )
             )
+
 
             choice = response.choices[0]
 
-            assistant_message = choice.message
+
+            assistant_message = (
+                choice.message
+            )
+
 
             print(
                 "FINISH REASON:",
                 choice.finish_reason
             )
+
 
             # ==================================
             # Final Answer
@@ -542,6 +924,7 @@ def run_agent(
                     assistant_message.content
                 )
 
+
                 if not final_answer:
 
                     return (
@@ -549,13 +932,16 @@ def run_agent(
                         "دریافت نشد."
                     )
 
+
                 save_conversation(
                     user_id=user_id,
                     user_message=message,
                     assistant_message=final_answer
                 )
 
+
                 return final_answer
+
 
             # ==================================
             # Tool Calls
@@ -567,11 +953,15 @@ def run_agent(
                 )
             )
 
-            for tool_call in assistant_message.tool_calls:
+
+            for tool_call in (
+                assistant_message.tool_calls
+            ):
 
                 tool_name = (
                     tool_call.function.name
                 )
+
 
                 try:
 
@@ -584,15 +974,18 @@ def run_agent(
 
                     arguments = {}
 
+
                 print(
                     "TOOL:",
                     tool_name
                 )
 
+
                 print(
                     "ARGUMENTS:",
                     arguments
                 )
+
 
                 try:
 
@@ -608,6 +1001,7 @@ def run_agent(
                         "error": str(tool_error)
                     }
 
+
                 messages.append(
                     {
                         "role": "tool",
@@ -619,15 +1013,19 @@ def run_agent(
                     }
                 )
 
+
         # ======================================
         # Final Attempt
         # ======================================
 
-        final_response = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            max_tokens=MAX_TOKENS
+        final_response = (
+            client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=MAX_TOKENS
+            )
         )
+
 
         final_answer = (
             final_response
@@ -635,6 +1033,7 @@ def run_agent(
             .message
             .content
         )
+
 
         if final_answer:
 
@@ -644,16 +1043,20 @@ def run_agent(
                 assistant_message=final_answer
             )
 
+
             return final_answer
+
 
         return (
             "Agent نتوانست پاسخ مناسبی تولید کند."
         )
 
+
     except Exception as e:
 
         print("\nAGENT ERROR:")
         print(repr(e))
+
 
         return (
             "متأسفانه هنگام پردازش درخواست شما "

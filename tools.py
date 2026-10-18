@@ -114,18 +114,10 @@ def search_web(query: str):
 
     try:
 
-        # ==========================================
-        # Responses URL
-        # ==========================================
-
         responses_url = (
             WEB_SEARCH_BASE_URL.rstrip("/")
             + "/responses"
         )
-
-        # ==========================================
-        # Payload
-        # ==========================================
 
         payload = {
             "model": WEB_SEARCH_MODEL,
@@ -162,20 +154,12 @@ def search_web(query: str):
             "web_search": True
         }
 
-        # ==========================================
-        # Headers
-        # ==========================================
-
         headers = {
             "Authorization": (
                 f"Bearer {WEB_SEARCH_API_KEY}"
             ),
             "Content-Type": "application/json"
         }
-
-        # ==========================================
-        # Request
-        # ==========================================
 
         response = requests.post(
             responses_url,
@@ -188,18 +172,10 @@ def search_web(query: str):
 
         data = response.json()
 
-        # ==========================================
-        # Main Answer
-        # ==========================================
-
         answer = data.get(
             "output_text",
             ""
         )
-
-        # ==========================================
-        # Extract Sources
-        # ==========================================
 
         sources = []
 
@@ -252,10 +228,6 @@ def search_web(query: str):
                             sources.append(
                                 source
                             )
-
-        # ==========================================
-        # Result
-        # ==========================================
 
         return {
             "success": True,
@@ -314,29 +286,17 @@ def search_products(
 
         search_query = query.strip()
 
-        # ==========================================
-        # Skin Type
-        # ==========================================
-
         if skin_type:
 
             search_query += (
                 f" برای پوست {skin_type}"
             )
 
-        # ==========================================
-        # Category
-        # ==========================================
-
         if category:
 
             search_query += (
                 f" {category}"
             )
-
-        # ==========================================
-        # Iran Market
-        # ==========================================
 
         search_query += """
 
@@ -347,10 +307,6 @@ def search_products(
 قیمت در صورت وجود.
 لینک صفحه محصول در صورت وجود.
 """
-
-        # ==========================================
-        # Web Search
-        # ==========================================
 
         result = search_web(
             search_query
@@ -529,19 +485,12 @@ def create_routine(
 ):
     """
     ساخت چارچوب روتین مراقبت از پوست و مو.
-
-    این Tool مستقل از Provider است و مستقیماً
-    هیچ مدل هوش مصنوعی را فراخوانی نمی‌کند.
     """
 
     allowed_days = [3, 7, 14, 30]
 
     if days not in allowed_days:
         days = 7
-
-    # ==========================================
-    # Normalize Inputs
-    # ==========================================
 
     skin = (
         skin_type or ""
@@ -560,8 +509,6 @@ def create_routine(
     skin_notes = []
 
     if skin:
-
-        # ---------- Oily Skin ----------
 
         if any(word in skin for word in [
             "چرب",
@@ -584,8 +531,6 @@ def create_routine(
                 "از شست‌وشوی بیش از حد و محصولات بسیار خشک‌کننده خودداری شود."
             )
 
-        # ---------- Dry Skin ----------
-
         elif any(word in skin for word in [
             "خشک",
             "dry"
@@ -607,8 +552,6 @@ def create_routine(
                 "از شوینده‌های قوی و شست‌وشوی مکرر با آب بسیار داغ خودداری شود."
             )
 
-        # ---------- Combination Skin ----------
-
         elif any(word in skin for word in [
             "مختلط",
             "combination"
@@ -629,8 +572,6 @@ def create_routine(
             skin_notes.append(
                 "نیاز نواحی مختلف صورت ممکن است متفاوت باشد."
             )
-
-        # ---------- Sensitive Skin ----------
 
         elif any(word in skin for word in [
             "حساس",
@@ -656,8 +597,6 @@ def create_routine(
                 "از استفاده همزمان چند ماده فعال تحریک‌کننده خودداری شود."
             )
 
-        # ---------- Normal Skin ----------
-
         else:
 
             morning_skin = [
@@ -680,8 +619,6 @@ def create_routine(
 
     if hair:
 
-        # ---------- Oily Hair ----------
-
         if any(word in hair for word in [
             "چرب",
             "oily"
@@ -697,8 +634,6 @@ def create_routine(
                 "از استفاده زیاد محصولات سنگین و چرب روی پوست سر خودداری شود."
             )
 
-        # ---------- Dry Hair ----------
-
         elif any(word in hair for word in [
             "خشک",
             "dry"
@@ -713,8 +648,6 @@ def create_routine(
             hair_notes.append(
                 "حرارت زیاد سشوار و ابزارهای حرارتی می‌تواند خشکی مو را بیشتر کند."
             )
-
-        # ---------- Damaged Hair ----------
 
         elif any(word in hair for word in [
             "آسیب",
@@ -732,8 +665,6 @@ def create_routine(
             hair_notes.append(
                 "در صورت شکستگی شدید یا آسیب مداوم، علت آسیب باید بررسی شود."
             )
-
-        # ---------- Normal Hair ----------
 
         else:
 
@@ -764,10 +695,6 @@ def create_routine(
             }
         )
 
-    # ==========================================
-    # Result
-    # ==========================================
-
     return {
         "success": True,
         "tool": "create_routine",
@@ -795,6 +722,431 @@ def create_routine(
 
 
 # ==========================================
+# Home Mask Planner
+# ==========================================
+
+def create_home_mask(
+    category: Optional[str] = None,
+    skin_type: Optional[str] = None,
+    hair_type: Optional[str] = None,
+    scalp_type: Optional[str] = None,
+    allergies: Optional[str] = None,
+    concerns: Optional[str] = None,
+    goal: Optional[str] = None
+):
+    """
+    پیشنهاد ماسک خانگی کم‌ریسک و شخصی‌سازی‌شده.
+
+    این تابع تشخیص پزشکی یا درمان بیماری انجام نمی‌دهد.
+    """
+
+    category_text = (
+        category or "پوست"
+    ).strip().lower()
+
+    skin = (
+        skin_type or ""
+    ).strip().lower()
+
+    hair = (
+        hair_type or ""
+    ).strip().lower()
+
+    scalp = (
+        scalp_type or ""
+    ).strip().lower()
+
+    allergy_text = (
+        allergies or ""
+    ).strip().lower()
+
+    concern_text = (
+        concerns or ""
+    ).strip().lower()
+
+    goal_text = (
+        goal or ""
+    ).strip().lower()
+
+    # ==========================================
+    # High-Risk Ingredients
+    # ==========================================
+
+    forbidden_ingredients = [
+        "لیمو",
+        "آبلیمو",
+        "سرکه",
+        "جوش شیرین",
+        "جوش‌شیرین",
+        "خمیردندان",
+        "الکل صنعتی",
+        "سفیدکننده",
+        "وایتکس"
+    ]
+
+    # ==========================================
+    # Allergy Matching
+    # ==========================================
+
+    allergy_keywords = []
+
+    known_ingredients = [
+        "جو دوسر",
+        "جو",
+        "ماست",
+        "لبنیات",
+        "شیر",
+        "عسل",
+        "آلوئه‌ورا",
+        "آلوئه ورا",
+        "آلوورا",
+        "آووکادو",
+        "تخم مرغ",
+        "تخم‌مرغ",
+        "نارگیل"
+    ]
+
+    for ingredient in known_ingredients:
+
+        if ingredient in allergy_text:
+
+            allergy_keywords.append(
+                ingredient
+            )
+
+    def is_safe(ingredients):
+
+        for ingredient in ingredients:
+
+            ingredient_lower = (
+                ingredient.lower()
+            )
+
+            for allergy in allergy_keywords:
+
+                if allergy in ingredient_lower:
+
+                    return False
+
+        return True
+
+    # ==========================================
+    # Category Detection
+    # ==========================================
+
+    is_hair = any(word in category_text for word in [
+        "مو",
+        "موها",
+        "hair"
+    ])
+
+    is_scalp = any(word in category_text for word in [
+        "پوست سر",
+        "scalp"
+    ])
+
+    # ==========================================
+    # Hair / Scalp Masks
+    # ==========================================
+
+    if is_hair or is_scalp:
+
+        if any(word in hair for word in [
+            "خشک",
+            "dry"
+        ]):
+
+            ingredients = [
+                "جو دوسر بسیار نرم آسیاب‌شده",
+                "آب ولرم"
+            ]
+
+            mask = {
+                "name": "ماسک ملایم جو دوسر برای موی خشک",
+                "category": category or "مو",
+                "ingredients": ingredients,
+                "method": (
+                    "جو دوسر بسیار نرم آسیاب‌شده را با مقدار کمی "
+                    "آب ولرم مخلوط کنید تا حالت خمیری ملایمی ایجاد شود. "
+                    "مقدار کمی روی ساقه مو قرار دهید و از تماس با چشم "
+                    "و پوست آسیب‌دیده خودداری کنید."
+                ),
+                "duration": "۵ تا ۱۰ دقیقه",
+                "frequency": "حداکثر هفته‌ای یک بار",
+                "notes": (
+                    "این ماسک درمان آسیب مو نیست. "
+                    "اگر باعث خارش یا سوزش شد، فوراً شسته شود."
+                )
+            }
+
+            if is_safe(ingredients):
+
+                return {
+                    "success": True,
+                    "tool": "create_home_mask",
+                    "personalized": True,
+                    "profile": {
+                        "category": category,
+                        "skin_type": skin_type,
+                        "hair_type": hair_type,
+                        "scalp_type": scalp_type,
+                        "allergies": allergies,
+                        "concerns": concerns,
+                        "goal": goal
+                    },
+                    "masks": [mask]
+                }
+
+        ingredients = [
+            "جو دوسر بسیار نرم آسیاب‌شده",
+            "آب ولرم"
+        ]
+
+        mask = {
+            "name": "ماسک ساده و ملایم جو دوسر",
+            "category": category or "مو",
+            "ingredients": ingredients,
+            "method": (
+                "جو دوسر بسیار نرم آسیاب‌شده را با آب ولرم "
+                "مخلوط کنید و مقدار کمی از آن را روی ساقه مو "
+                "قرار دهید."
+            ),
+            "duration": "۵ تا ۱۰ دقیقه",
+            "frequency": "حداکثر هفته‌ای یک بار",
+            "notes": (
+                "از تماس با چشم و پوست آسیب‌دیده خودداری کنید. "
+                "در صورت تحریک، استفاده را متوقف کنید."
+            )
+        }
+
+        return {
+            "success": True,
+            "tool": "create_home_mask",
+            "personalized": True,
+            "profile": {
+                "category": category,
+                "skin_type": skin_type,
+                "hair_type": hair_type,
+                "scalp_type": scalp_type,
+                "allergies": allergies,
+                "concerns": concerns,
+                "goal": goal
+            },
+            "masks": [mask]
+        }
+
+    # ==========================================
+    # Sensitive Skin
+    # ==========================================
+
+    if any(word in skin for word in [
+        "حساس",
+        "sensitive"
+    ]):
+
+        ingredients = [
+            "جو دوسر بسیار نرم آسیاب‌شده",
+            "آب ولرم"
+        ]
+
+        if not is_safe(ingredients):
+
+            return {
+                "success": True,
+                "tool": "create_home_mask",
+                "personalized": True,
+                "masks": [],
+                "message": (
+                    "با توجه به اطلاعات حساسیت ثبت‌شده، "
+                    "ماسک خانگی مناسبی که بتوان با اطمینان "
+                    "پیشنهاد داد پیدا نشد."
+                )
+            }
+
+        mask = {
+            "name": "ماسک ساده جو دوسر برای پوست حساس",
+            "category": category or "پوست",
+            "ingredients": ingredients,
+            "method": (
+                "جو دوسر بسیار نرم آسیاب‌شده را با آب ولرم "
+                "مخلوط کنید تا خمیر بسیار نرم ایجاد شود. "
+                "لایه نازکی روی پوست قرار دهید."
+            ),
+            "duration": "۵ تا ۱۰ دقیقه",
+            "frequency": "حداکثر هفته‌ای یک بار",
+            "notes": (
+                "قبل از استفاده روی بخش کوچکی از پوست تست شود. "
+                "در صورت سوزش، قرمزی یا خارش، فوراً شسته شود."
+            )
+        }
+
+        return {
+            "success": True,
+            "tool": "create_home_mask",
+            "personalized": True,
+            "profile": {
+                "category": category,
+                "skin_type": skin_type,
+                "hair_type": hair_type,
+                "scalp_type": scalp_type,
+                "allergies": allergies,
+                "concerns": concerns,
+                "goal": goal
+            },
+            "masks": [mask]
+        }
+
+    # ==========================================
+    # Dry Skin
+    # ==========================================
+
+    if any(word in skin for word in [
+        "خشک",
+        "dry"
+    ]):
+
+        ingredients = [
+            "جو دوسر بسیار نرم آسیاب‌شده",
+            "آب ولرم"
+        ]
+
+        mask = {
+            "name": "ماسک جو دوسر ساده برای پوست خشک",
+            "category": category or "پوست",
+            "ingredients": ingredients,
+            "method": (
+                "جو دوسر بسیار نرم آسیاب‌شده را با آب ولرم "
+                "مخلوط کنید تا خمیر نرمی ایجاد شود. "
+                "لایه نازکی روی پوست قرار دهید."
+            ),
+            "duration": "۵ تا ۱۰ دقیقه",
+            "frequency": "هفته‌ای یک بار",
+            "notes": (
+                "پس از شست‌وشو از مرطوب‌کننده مناسب استفاده شود. "
+                "اگر پوست تحریک شد، استفاده را متوقف کنید."
+            )
+        }
+
+        return {
+            "success": True,
+            "tool": "create_home_mask",
+            "personalized": True,
+            "profile": {
+                "category": category,
+                "skin_type": skin_type,
+                "hair_type": hair_type,
+                "scalp_type": scalp_type,
+                "allergies": allergies,
+                "concerns": concerns,
+                "goal": goal
+            },
+            "masks": [mask]
+        }
+
+    # ==========================================
+    # Oily Skin
+    # ==========================================
+
+    if any(word in skin for word in [
+        "چرب",
+        "oily"
+    ]):
+
+        ingredients = [
+            "جو دوسر بسیار نرم آسیاب‌شده",
+            "آب ولرم"
+        ]
+
+        mask = {
+            "name": "ماسک ساده جو دوسر برای پوست چرب",
+            "category": category or "پوست",
+            "ingredients": ingredients,
+            "method": (
+                "جو دوسر بسیار نرم آسیاب‌شده را با آب ولرم "
+                "مخلوط کنید و لایه نازکی روی پوست قرار دهید."
+            ),
+            "duration": "۵ تا ۱۰ دقیقه",
+            "frequency": "هفته‌ای یک بار",
+            "notes": (
+                "این ماسک جایگزین درمان آکنه نیست. "
+                "از مالش شدید پوست خودداری شود."
+            )
+        }
+
+        return {
+            "success": True,
+            "tool": "create_home_mask",
+            "personalized": True,
+            "profile": {
+                "category": category,
+                "skin_type": skin_type,
+                "hair_type": hair_type,
+                "scalp_type": scalp_type,
+                "allergies": allergies,
+                "concerns": concerns,
+                "goal": goal
+            },
+            "masks": [mask]
+        }
+
+    # ==========================================
+    # Default Safe Mask
+    # ==========================================
+
+    ingredients = [
+        "جو دوسر بسیار نرم آسیاب‌شده",
+        "آب ولرم"
+    ]
+
+    if not is_safe(ingredients):
+
+        return {
+            "success": True,
+            "tool": "create_home_mask",
+            "personalized": True,
+            "masks": [],
+            "message": (
+                "با توجه به حساسیت ثبت‌شده، "
+                "ماسک خانگی مناسبی برای پیشنهاد خودکار وجود ندارد."
+            )
+        }
+
+    mask = {
+        "name": "ماسک ساده جو دوسر",
+        "category": category or "پوست",
+        "ingredients": ingredients,
+        "method": (
+            "جو دوسر بسیار نرم آسیاب‌شده را با آب ولرم "
+            "مخلوط کنید تا خمیر نرم ایجاد شود. "
+            "لایه نازکی روی پوست قرار دهید."
+        ),
+        "duration": "۵ تا ۱۰ دقیقه",
+        "frequency": "هفته‌ای یک بار",
+        "notes": (
+            "قبل از استفاده روی بخش کوچکی از پوست تست شود. "
+            "در صورت ایجاد سوزش، خارش یا قرمزی، "
+            "استفاده متوقف شود."
+        )
+    }
+
+    return {
+        "success": True,
+        "tool": "create_home_mask",
+        "personalized": True,
+        "profile": {
+            "category": category,
+            "skin_type": skin_type,
+            "hair_type": hair_type,
+            "scalp_type": scalp_type,
+            "allergies": allergies,
+            "concerns": concerns,
+            "goal": goal
+        },
+        "masks": [mask]
+    }
+
+
+# ==========================================
 # Safety Check
 # ==========================================
 
@@ -807,8 +1159,6 @@ def safety_check(
     مو و پوست سر.
 
     این تابع تشخیص پزشکی انجام نمی‌دهد.
-    هدف آن شناسایی نشانه‌هایی است که ممکن است
-    نیاز به ارزیابی پزشک داشته باشند.
     """
 
     if not message:
@@ -819,10 +1169,6 @@ def safety_check(
             "needs_doctor": False,
             "reason": "پیام کاربر خالی است."
         }
-
-    # ==========================================
-    # Warning Signs
-    # ==========================================
 
     warning_groups = {
 
@@ -898,10 +1244,6 @@ def safety_check(
         ]
     }
 
-    # ==========================================
-    # Combine Text
-    # ==========================================
-
     combined_text = message
 
     if image_analysis:
@@ -911,10 +1253,6 @@ def safety_check(
         )
 
     combined_text = combined_text.lower()
-
-    # ==========================================
-    # Detect Warnings
-    # ==========================================
 
     detected = []
 
@@ -930,15 +1268,7 @@ def safety_check(
 
                 break
 
-    # ==========================================
-    # Doctor Required
-    # ==========================================
-
     needs_doctor = len(detected) > 0
-
-    # ==========================================
-    # Reason
-    # ==========================================
 
     if needs_doctor:
 
@@ -953,10 +1283,6 @@ def safety_check(
             "در متن ارسال‌شده علامت هشدار واضحی "
             "شناسایی نشد."
         )
-
-    # ==========================================
-    # Result
-    # ==========================================
 
     return {
         "success": True,
